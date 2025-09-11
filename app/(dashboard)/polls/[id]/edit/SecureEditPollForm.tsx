@@ -21,13 +21,13 @@ interface PollData {
 export default function EditPollForm({ poll }: { poll: PollData }) {
   const router = useRouter();
   const { user } = useAuth();
-  const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState<string[]>([]);
+  const [question, setQuestion] = useState<string>(poll?.question || '');
+  const [options, setOptions] = useState<string[]>(poll?.options || ['', '']);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [csrfToken, setCsrfToken] = useState('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [success, setSuccess] = useState<boolean>(false);
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
+  const [csrfToken, setCsrfToken] = useState<string>('');
   
   // Generate CSRF token on mount
   useEffect(() => {
@@ -39,8 +39,8 @@ export default function EditPollForm({ poll }: { poll: PollData }) {
   // Check authorization and sanitize input data on mount
   useEffect(() => {
     const checkAuth = async () => {
-      // Validate poll data exists
-      if (!poll || !poll.id) {
+      // Validate poll data exists and has valid ID format
+      if (!poll || !poll.id || !isValidPollId(poll.id)) {
         setError('Invalid poll data');
         return;
       }
@@ -74,7 +74,7 @@ export default function EditPollForm({ poll }: { poll: PollData }) {
   }, [poll, user]);
 
   const handleOptionChange = (idx: number, value: string) => {
-    setOptions((opts) => opts.map((opt, i) => (i === idx ? sanitizeText(value) : opt)));
+    setOptions((opts: string[]) => opts.map((opt: string, i: number) => (i === idx ? sanitizeText(value) : opt)));
   };
 
   const addOption = () => {
@@ -82,15 +82,15 @@ export default function EditPollForm({ poll }: { poll: PollData }) {
       setError('Maximum 10 options allowed');
       return;
     }
-    setOptions((opts) => [...opts, '']);
+    setOptions((opts: string[]) => [...opts, '']);
   };
   
   const removeOption = (idx: number) => {
     if (options.length > 2) {
-      setOptions((opts) => opts.filter((_, i) => i !== idx));
+      setOptions((opts: string[]) => opts.filter((_, i: number) => i !== idx));
     }
   };
-
+  
   const handleSubmit = async (formData: FormData) => {
     try {
       // Reset states
@@ -197,7 +197,7 @@ export default function EditPollForm({ poll }: { poll: PollData }) {
       
       <div>
         <Label>Options</Label>
-        {options.map((opt, idx) => (
+        {options.map((opt: string, idx: number) => (
           <div key={idx} className="flex items-center gap-2 mb-2">
             <Input
               name="options"

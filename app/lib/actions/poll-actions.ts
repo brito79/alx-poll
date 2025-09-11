@@ -6,11 +6,13 @@ import {
   sanitizeText, 
   validateOptions, 
   validateQuestion, 
-  validatePollId,
+  validatePollId
+} from "../utils/poll-validation";
+import {
   validateOptionIndex,
   userOwnsPoll,
   hasUserVoted
-} from "../utils/poll-validation";
+} from "../utils/poll-validation-server";
 import { checkPollActionRateLimit, logSecurityEvent } from "../utils/security";
 
 // CREATE POLL
@@ -61,8 +63,8 @@ export async function createPoll(formData: FormData) {
     }
     
     // Check rate limiting
-    if (!checkPollActionRateLimit(user.id, 'createPoll')) {
-      logSecurityEvent('create_poll_rate_limited', false, { 
+    if (!await checkPollActionRateLimit(user.id, 'createPoll')) {
+      await logSecurityEvent('create_poll_rate_limited', false, { 
         userId: user.id, 
         details: 'Rate limit exceeded for poll creation' 
       });
@@ -266,8 +268,8 @@ export async function submitVote(pollId: string, optionIndex: number) {
       }
       
       // Check rate limiting for logged-in users
-      if (!checkPollActionRateLimit(user.id, 'votePoll')) {
-        logSecurityEvent('submit_vote_rate_limited', false, { 
+      if (!await checkPollActionRateLimit(user.id, 'votePoll')) {
+        await logSecurityEvent('submit_vote_rate_limited', false, { 
           pollId,
           userId: user.id, 
           details: 'Rate limit exceeded for voting' 
@@ -343,8 +345,8 @@ export async function deletePoll(id: string) {
     }
     
     // Check rate limiting
-    if (!checkPollActionRateLimit(user.id, 'deletePoll')) {
-      logSecurityEvent('delete_poll_rate_limited', false, { 
+    if (!await checkPollActionRateLimit(user.id, 'deletePoll')) {
+      await logSecurityEvent('delete_poll_rate_limited', false, { 
         pollId: id,
         userId: user.id, 
         details: 'Rate limit exceeded for poll deletion' 
@@ -452,8 +454,8 @@ export async function updatePoll(pollId: string, formData: FormData) {
     }
     
     // Check rate limiting
-    if (!checkPollActionRateLimit(user.id, 'createPoll')) {  // We can reuse createPoll rate limit
-      logSecurityEvent('update_poll_rate_limited', false, { 
+    if (!await checkPollActionRateLimit(user.id, 'createPoll')) {  // We can reuse createPoll rate limit
+      await logSecurityEvent('update_poll_rate_limited', false, { 
         pollId,
         userId: user.id, 
         details: 'Rate limit exceeded for poll updates' 

@@ -70,12 +70,12 @@ export async function logAuthEvent(
  * @param windowMs Time window in milliseconds (default: 1 hour)
  * @returns Object with allowed (boolean) and resetTime (Date)
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   action: string,
   limit: number,
   windowMs = 60 * 60 * 1000
-): { allowed: boolean; resetTime: Date; remaining: number } {
+): Promise<{ allowed: boolean; resetTime: Date; remaining: number }> {
   const now = Date.now();
   const identifier = `${key}:${action}`;
 
@@ -96,7 +96,7 @@ export function checkRateLimit(
 
   // Log rate limit event if denied
   if (!allowed) {
-    logSecurityEvent(
+    await logSecurityEvent(
       'rate_limit_exceeded',
       false,
       { 
@@ -119,7 +119,7 @@ export function checkRateLimit(
  * @param action Action type (create, vote, etc)
  * @returns True if allowed, false if rate limited
  */
-export function checkPollActionRateLimit(userId: string, action: string): boolean {
+export async function checkPollActionRateLimit(userId: string, action: string): Promise<boolean> {
   let limit: number;
   
   // Set limits for different actions
@@ -137,7 +137,7 @@ export function checkPollActionRateLimit(userId: string, action: string): boolea
       limit = 60; // Default limit for other actions
   }
   
-  const result = checkRateLimit(`user_${userId}`, action, limit);
+  const result = await checkRateLimit(`user_${userId}`, action, limit);
   return result.allowed;
 }
 
@@ -148,7 +148,7 @@ const loginAttempts = new Map<string, { count: number; firstAttempt: Date }>();
  * Checks if a user/email has exceeded login attempt limits
  * Returns true if rate limit exceeded, false otherwise
  */
-export function isRateLimited(identifier: string): { limited: boolean; remainingAttempts: number } {
+export async function isRateLimited(identifier: string): Promise<{ limited: boolean; remainingAttempts: number }> {
   const MAX_ATTEMPTS = 5;
   const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
   const now = new Date();
@@ -176,6 +176,6 @@ export function isRateLimited(identifier: string): { limited: boolean; remaining
 /**
  * Reset rate limit counter (e.g., after successful login)
  */
-export function resetRateLimit(identifier: string): void {
+export async function resetRateLimit(identifier: string): Promise<void> {
   loginAttempts.delete(identifier);
 }

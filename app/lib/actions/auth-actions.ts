@@ -16,7 +16,7 @@ export async function login(data: LoginFormData) {
     // Step 2: Apply rate limiting
     // Use email as rate limit key - in production consider combining with IP
     const rateLimitKey = `login:${data.email.toLowerCase()}`;
-    const { limited, remainingAttempts } = isRateLimited(rateLimitKey);
+    const { limited, remainingAttempts } = await isRateLimited(rateLimitKey);
     
     if (limited) {
       // Log excessive attempts
@@ -56,7 +56,7 @@ export async function login(data: LoginFormData) {
 
     // Step 5: Success path
     // Reset rate limit counter on successful login
-    resetRateLimit(rateLimitKey);
+    await resetRateLimit(rateLimitKey);
     
     // Log successful login
     await logAuthEvent('login_success', true, { 
@@ -85,7 +85,7 @@ export async function register(data: RegisterFormData) {
     // Apply rate limiting (for registration spam prevention)
     const { isRateLimited, logAuthEvent } = await import('../utils/security');
     const rateLimitKey = `register:${data.email.toLowerCase()}`;
-    const { limited } = isRateLimited(rateLimitKey);
+    const { limited } = await isRateLimited(rateLimitKey);
     
     if (limited) {
       // Log excessive registration attempts
