@@ -1,5 +1,124 @@
-# Poll Management Security Audit
 
+# ALX-Polly Application
+
+ALX-Polly is a secure polling application built with Next.js, TypeScript, and Supabase.
+
+## Features
+
+- Create and manage polls
+- Secure voting system
+- User authentication
+- Poll sharing
+- Real-time results
+- Comprehensive security measures
+
+## Setup Instructions
+
+1. **Clone the repository**
+
+```bash
+git clone https://github.com/yourusername/alx-polly.git
+cd alx-polly
+```
+
+2. **Install dependencies**
+
+```bash
+npm install
+```
+
+3. **Set up environment variables**
+
+Create a `.env.local` file in the root directory with the following variables:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+```
+
+4. **Set up the database**
+
+Run the migration scripts in the `lib/supabase/migrations` directory in your Supabase SQL editor:
+
+```sql
+-- First run:
+001_initial_schema.sql
+-- Then:
+002_rls_policies.sql
+-- Finally:
+003_views_and_functions.sql
+```
+
+5. **Run the development server**
+
+```bash
+npm run dev
+```
+
+6. **Create sample data**
+
+To test the application with sample data, you can run the provided script:
+
+```bash
+node scripts/create-sample-data.js
+```
+
+This will create:
+- A sample user with email: test@example.com and password: password123
+- Three sample polls with various options
+
+## Security Documentation
+
+This application has undergone comprehensive security audits. For detailed security documentation, please refer to the files in the `docs` directory:
+
+1. [API Security Audit](./docs/API-SECURITY-AUDIT.md)
+2. [Authentication Security Audit](./docs/AUTHENTICATION-SECURITY-AUDIT.md)
+3. [Database Security Audit](./docs/DATABASE-SECURITY-AUDIT.md)
+4. [Client-Side Security Audit](./docs/CLIENT-SIDE-SECURITY-AUDIT.md)
+5. [Poll Creation Security](./docs/POLL-CREATION-SECURITY.md)
+6. [Poll Sharing Security Audit](./docs/POLL-SHARING-SECURITY-AUDIT.md)
+7. [Rate Limiting Security Audit](./docs/RATE-LIMITING-SECURITY-AUDIT.md)
+8. [Poll Management Security Audit](./docs/POLL-MANAGEMENT-SECURITY-AUDIT.md)
+9. [UI Security Audit](./docs/UI-SECURITY-AUDIT.md)
+
+
+
+## Database Schema
+
+The application uses the following primary tables:
+
+1. **profiles** - Extended user information (linked to auth.users)
+2. **polls** - Main polls table with fields:
+   - id (UUID)
+   - title (TEXT)
+   - description (TEXT)
+   - creator_id (UUID)
+   - is_active (BOOLEAN)
+   - allow_multiple_choices (BOOLEAN)
+   - expires_at (TIMESTAMP)
+   - created_at (TIMESTAMP)
+   - updated_at (TIMESTAMP)
+
+3. **poll_options** - Individual options for each poll:
+   - id (UUID)
+   - poll_id (UUID)
+   - text (TEXT)
+   - order_index (INTEGER)
+   - created_at (TIMESTAMP)
+
+4. **votes** - Records of user votes:
+   - id (UUID)
+   - poll_id (UUID)
+   - option_id (UUID)
+   - user_id (UUID, optional)
+   - ip_address (INET, for anonymous voting)
+   - created_at (TIMESTAMP)
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 ## Overview
 
 This document details the security audit performed on the poll management functionality of ALX-Polly. The audit covers poll creation, editing, deletion, and access control mechanisms.
@@ -1980,19 +2099,6 @@ The ALX-Polly application has undergone a comprehensive security audit covering 
 
 The remaining in-progress and pending issues should be addressed according to their severity, and the recommended security enhancements should be implemented to further strengthen the application's security. Regular security audits and ongoing security monitoring are recommended to maintain a strong security posture as the application evolves.
 
-## Detailed Audit Reports
-
-For detailed findings and recommendations, please refer to the following audit reports:
-
-1. [API Security Audit](./API-SECURITY-AUDIT.md)
-2. [Authentication Security Audit](./AUTHENTICATION-SECURITY-AUDIT.md)
-3. [Database Security Audit](./DATABASE-SECURITY-AUDIT.md)
-4. [Client-Side Security Audit](./CLIENT-SIDE-SECURITY-AUDIT.md)
-5. [Poll Creation Security](./POLL-CREATION-SECURITY.md)
-6. [Poll Sharing Security Audit](./POLL-SHARING-SECURITY-AUDIT.md)
-7. [Rate Limiting Security Audit](./RATE-LIMITING-SECURITY-AUDIT.md)
-8. [Poll Management Security Audit](./POLL-MANAGEMENT-SECURITY-AUDIT.md)
-9. [UI Security Audit](./UI-SECURITY-AUDIT.md)
 
 
 

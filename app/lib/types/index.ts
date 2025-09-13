@@ -12,24 +12,23 @@ export interface User {
 export interface PollOption {
   id: string;
   text: string;
-  votes: number;
+  poll_id: string;
+  order_index: number;
+  vote_count?: number;
 }
 
 export interface Poll {
   id: string;
   title: string;
   description?: string;
-  options: PollOption[];
-  createdBy: string; // User ID
-  createdAt: Date;
-  updatedAt: Date;
-  endDate?: Date;
-  settings: PollSettings;
-}
-
-export interface PollSettings {
-  allowMultipleVotes: boolean;
-  requireAuthentication: boolean;
+  creator_id: string;
+  is_active: boolean;
+  allow_multiple_choices: boolean;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+  options?: PollOption[];
+  total_votes?: number;
 }
 
 // Vote types
@@ -46,8 +45,8 @@ export interface CreatePollFormData {
   title: string;
   description?: string;
   options: string[];
-  settings: PollSettings;
-  endDate?: string;
+  allow_multiple_choices?: boolean;
+  expires_at?: string;
 }
 
 export interface LoginFormData {

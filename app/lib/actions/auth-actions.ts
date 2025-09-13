@@ -5,6 +5,23 @@ import { LoginFormData, RegisterFormData } from '../types';
 import { validateLoginForm } from '../utils/validation';
 import { isRateLimited, resetRateLimit, logAuthEvent } from '../utils/security';
 
+/**
+ * User Authentication Server Action
+ * 
+ * Authenticates users against the Supabase backend with comprehensive security measures.
+ * This function is critical to the application's security model as it:
+ * 1. Serves as the primary authentication gateway for all user access
+ * 2. Implements rate limiting to prevent brute force attacks
+ * 3. Manages secure credential validation without leaking sensitive information
+ * 4. Provides proper audit logging for security events
+ * 
+ * Used in: The login page form submission process. This server action is the bridge
+ * between the client-side login form and the backend authentication system.
+ * It directly impacts the user's ability to access protected routes and features.
+ * 
+ * @param {LoginFormData} data - User credentials containing email and password
+ * @returns {Promise<{error: string | null}>} Result object with error message if login failed
+ */
 export async function login(data: LoginFormData) {
   try {
     // Step 1: Validate input data
@@ -73,6 +90,23 @@ export async function login(data: LoginFormData) {
   }
 }
 
+/**
+ * User Registration Server Action
+ * 
+ * Creates new user accounts with the Supabase authentication service.
+ * This function is fundamental to user acquisition and system security as it:
+ * 1. Establishes new user identities in the authentication system
+ * 2. Validates registration data to ensure data quality
+ * 3. Prevents registration spam through rate limiting
+ * 4. Creates the necessary user profile records
+ * 
+ * Used in: The registration page form submission process. This server action 
+ * transforms anonymous visitors into authenticated users and creates the foundation
+ * for user-specific data throughout the application.
+ * 
+ * @param {RegisterFormData} data - User registration data including email, password, and name
+ * @returns {Promise<{error: string | null}>} Result object with error message if registration failed
+ */
 export async function register(data: RegisterFormData) {
   try {
     // Import validation utility
@@ -143,6 +177,22 @@ export async function register(data: RegisterFormData) {
   }
 }
 
+/**
+ * User Logout Server Action
+ * 
+ * Terminates the user's active session and clears authentication state.
+ * This function is essential to the application's security lifecycle as it:
+ * 1. Properly ends authenticated sessions to prevent session hijacking
+ * 2. Clears authentication tokens and state
+ * 3. Records session termination for audit purposes
+ * 4. Creates a clean transition between authenticated and unauthenticated states
+ * 
+ * Used in: The application header/navigation when users click logout, and potentially
+ * in session timeout handlers. This action ensures proper security boundaries by
+ * allowing users to explicitly terminate their access.
+ * 
+ * @returns {Promise<{error: string | null}>} Result object with error message if logout failed
+ */
 export async function logout() {
   try {
     // Get current user before logout for logging
@@ -181,6 +231,22 @@ export async function logout() {
   }
 }
 
+/**
+ * Current User Retrieval Function
+ * 
+ * Fetches information about the currently authenticated user from Supabase.
+ * This function is central to the application's authentication context as it:
+ * 1. Provides identity information for personalization throughout the app
+ * 2. Enables authorization checks for protected resources and actions
+ * 3. Serves as the source of truth for user authentication state
+ * 4. Facilitates user-specific data queries and operations
+ * 
+ * Used in: The authentication context provider, authorization checks, and anywhere
+ * the application needs to know about the current user's identity. This function
+ * is frequently called during navigation and when performing user-specific operations.
+ * 
+ * @returns {Promise<User|null>} The current user object or null if not authenticated
+ */
 export async function getCurrentUser() {
   try {
     const supabase = await createClient();
@@ -198,6 +264,22 @@ export async function getCurrentUser() {
   }
 }
 
+/**
+ * Authentication Session Retrieval Function
+ * 
+ * Fetches the current authentication session state from Supabase.
+ * This function is vital to the application's authentication lifecycle as it:
+ * 1. Provides detailed session information beyond just user identity
+ * 2. Enables session-based security features and checks
+ * 3. Allows the application to verify token validity and expiration
+ * 4. Supports middleware and server-side authentication verification
+ * 
+ * Used in: Authentication context providers, middleware, and server components
+ * that need to verify the authentication state. This function is particularly
+ * important for SSR and API routes that need access to the current session.
+ * 
+ * @returns {Promise<Session|null>} The current session object or null if not authenticated
+ */
 export async function getSession() {
   try {
     const supabase = await createClient();

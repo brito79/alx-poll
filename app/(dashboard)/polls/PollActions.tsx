@@ -11,43 +11,80 @@ import { isValidPollId, sanitizeText } from "@/app/lib/utils/share-security";
 
 // Strong typing for poll data
 interface PollOption {
+  id: string;
   text: string;
+  poll_id: string;
+  order_index: number;
+  vote_count?: number;
 }
 
 interface Poll {
   id: string;
-  question: string;
+  title: string;
+  description?: string;
+  creator_id: string;
+  is_active: boolean;
+  allow_multiple_choices: boolean;
   options: PollOption[];
-  user_id: string;
 }
 
 interface PollActionsProps {
   poll: Poll;
 }
 
+/**
+ * Poll Actions Component
+ * 
+ * Provides management controls and actions for individual polls.
+ * This component is essential to the poll management experience as it:
+ * 1. Enables poll creators to manage their content through a unified interface
+ * 2. Implements proper authorization checks before allowing actions
+ * 3. Provides secure deletion capabilities with confirmation
+ * 4. Handles error states and user feedback for management operations
+ * 
+ * Used in: Poll detail pages, management interfaces, and anywhere users
+ * need to perform CRUD operations on polls they own. This component
+ * represents the primary control surface for poll management.
+ * 
+ * @param {Object} props - Component properties
+ * @param {Poll} props.poll - The poll object to render actions for
+ */
 export default function PollActions({ poll }: PollActionsProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Validate poll ID for security
+  // Validate poll ID for security to prevent ID-based attacks
   const isValidId = poll && poll.id && isValidPollId(poll.id);
   
   // Check if user is authorized to modify this poll
-  const isAuthorized = user && poll && user.id === poll.user_id;
+  const isAuthorized = user && poll && user.id === poll.creator_id;
   
+  /**
+   * Poll Deletion Handler
+   * 
+   * Manages the secure deletion process for a poll with validation and confirmation.
+   * This function is critical to content management as it:
+   * 1. Implements client-side security checks before deletion
+   * 2. Enforces proper authorization for destructive operations
+   * 3. Provides user confirmation to prevent accidental deletions
+   * 4. Handles the complete deletion flow with proper error management
+   * 
+   * Used when a user clicks the delete button for a poll they own,
+   * this function coordinates the deletion server action and UI feedback.
+   */
   const handleDelete = async () => {
-    // Reset error state
+    // Reset error state before new operation
     setError(null);
     
-    // Check for valid ID
+    // Check for valid ID to prevent malformed requests
     if (!isValidId) {
       setError("Invalid poll ID format");
       return;
     }
     
-    // Check authorization
+    // Verify user authorization to prevent unauthorized deletions
     if (!isAuthorized) {
       setError("You don't have permission to delete this poll");
       return;
@@ -91,8 +128,8 @@ export default function PollActions({ poll }: PollActionsProps) {
             <div className="h-full">
               <div>
                 <h2 className="group-hover:text-blue-600 transition-colors font-bold text-lg">
-                  {/* Sanitize question text to prevent XSS */}
-                  {sanitizeText(poll.question)}
+                  {/* Sanitize title text to prevent XSS */}
+                  {sanitizeText(poll.title)}
                 </h2>
                 <p className="text-slate-500">
                   {Array.isArray(poll.options) ? poll.options.length : 0} options

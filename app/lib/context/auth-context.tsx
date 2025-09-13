@@ -45,13 +45,27 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 /**
- * Auth Provider component that manages authentication state
+ * Authentication Provider Component
+ * 
+ * Establishes the global authentication context for the entire application.
+ * This component is foundational to the app's security architecture as it:
+ * 1. Manages the authentication state across all components
+ * 2. Provides real-time session tracking and token refresh capabilities
+ * 3. Handles authentication events (sign-in, sign-out, session expiration)
+ * 4. Establishes security boundaries for protected resources and routes
+ * 
+ * Used in: The root layout of the application, wrapping all other components.
+ * Every authenticated interaction and protected route depends on this provider
+ * to determine access permissions and user identity.
+ * 
+ * @param {Object} props - Component props
+ * @param {React.ReactNode} props.children - Child components to render within this provider
  */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  // Create Supabase client once
+  // Create Supabase client once for efficiency and consistent authentication state
   const supabase = useMemo(() => createClient(), []);
   
-  // Use a single state object to prevent race conditions
+  // Use a single atomic state object to prevent race conditions during auth state updates
   const [authState, setAuthState] = useState<AuthState>(initialAuthState);
 
   // Effect to handle auth state and session management
@@ -163,11 +177,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [supabase]);
 
   /**
-   * Secure sign out function with error handling
+   * Secure Sign Out Function
+   * 
+   * Terminates the user's active session with comprehensive error handling.
+   * This function is critical to the authentication lifecycle as it:
+   * 1. Provides a controlled mechanism to end user sessions
+   * 2. Ensures proper cleanup of authentication state
+   * 3. Handles potential failures gracefully to prevent stuck states
+   * 4. Updates the auth context to reflect the unauthenticated state
+   * 
+   * Used in: The application header's logout button, session timeout handlers,
+   * and security-sensitive areas where manual session termination is needed.
+   * This is the primary way users explicitly end their authenticated sessions.
+   * 
+   * @returns {Promise<void>} Promise that resolves when sign out is complete
    */
   const signOut = async (): Promise<void> => {
     try {
-      // Show loading state while signing out
+      // Show loading state while signing out for user feedback
       setAuthState(prev => ({ ...prev, loading: true }));
       
       const { error } = await supabase.auth.signOut();
@@ -215,7 +242,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 /**
- * Enhanced authentication hook with security features
+ * Enhanced Authentication Hook
+ * 
+ * Provides access to authentication state and security utilities throughout the app.
+ * This hook is central to the application's security implementation as it:
+ * 1. Creates a consistent interface for accessing authentication state
+ * 2. Provides role-based access control capabilities
+ * 3. Offers resource ownership validation for authorization
+ * 4. Abstracts sensitive user data into safe display formats
+ * 
+ * Used in: Throughout the application in any component that needs to:
+ * - Check if a user is authenticated
+ * - Access the current user's information
+ * - Verify permissions for protected operations
+ * - Implement conditional rendering based on authentication state
+ * - Handle login/logout flows
+ * 
+ * @returns {AuthContextType & SecurityHelpers} Authentication state and security helper functions
  */
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -229,7 +272,21 @@ export const useAuth = () => {
     ...context,
     
     /**
-     * Check if the current user has the required role(s)
+     * Role-Based Access Control Function
+     * 
+     * Verifies if the current user has any of the specified roles.
+     * This function is essential to the application's authorization model as it:
+     * 1. Enables fine-grained access control throughout the application
+     * 2. Creates a reusable pattern for role-based authorization checks
+     * 3. Centralizes role verification to ensure consistent security enforcement
+     * 4. Gracefully handles unauthenticated states without errors
+     * 
+     * Used in: Protected routes, admin panels, conditional UI rendering,
+     * and anywhere the application needs to restrict features based on user roles.
+     * This is a primary authorization mechanism for role-gated functionality.
+     * 
+     * @param {string[]} requiredRoles - Array of role names to check against
+     * @returns {boolean} True if user has any of the required roles
      */
     hasRole: (requiredRoles: string[]): boolean => {
       if (!context.user || !context.isAuthenticated) return false;
@@ -240,7 +297,21 @@ export const useAuth = () => {
     },
     
     /**
-     * Check if the current user owns a resource
+     * Resource Ownership Verification Function
+     * 
+     * Determines if the current user owns a specific resource.
+     * This function is crucial to the application's data security model as it:
+     * 1. Enforces ownership-based access control for user-specific resources
+     * 2. Prevents unauthorized access to other users' content
+     * 3. Creates a consistent pattern for ownership verification
+     * 4. Simplifies complex authorization checks in components
+     * 
+     * Used in: Poll management screens, voting interfaces, content editing forms,
+     * and anywhere the application needs to verify that a user owns the resource
+     * they're attempting to modify, view, or delete.
+     * 
+     * @param {string|null} resourceUserId - The user ID associated with the resource
+     * @returns {boolean} True if the current user owns the resource
      */
     isResourceOwner: (resourceUserId: string | null): boolean => {
       if (!context.user || !context.isAuthenticated || !resourceUserId) return false;
@@ -248,7 +319,20 @@ export const useAuth = () => {
     },
     
     /**
-     * Get safe user display data (non-sensitive)
+     * Safe User Information Accessor
+     * 
+     * Provides a sanitized subset of user data for display purposes.
+     * This function enhances application security and privacy by:
+     * 1. Creating a boundary between sensitive user data and display contexts
+     * 2. Ensuring only appropriate user information is exposed in the UI
+     * 3. Standardizing the user information format across components
+     * 4. Preventing accidental exposure of sensitive authentication details
+     * 
+     * Used in: Profile displays, headers showing user information, user-specific
+     * UI elements, and anywhere the application needs to show user information
+     * without exposing sensitive authentication details.
+     * 
+     * @returns {Object|null} Sanitized user display information or null if not authenticated
      */
     getUserDisplayInfo: () => {
       if (!context.user) return null;

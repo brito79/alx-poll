@@ -5,33 +5,17 @@ import { revalidatePath } from "next/cache";
 import { 
   sanitizeText, 
   validateOptions, 
-  validateQuestion
+  validateQuestion, 
+  validatePollId
 } from "../utils/poll-validation";
 import {
-  validatePollId,
   validatePollOption,
   userOwnsPoll,
   hasUserVoted
 } from "../utils/poll-validation-server";
 import { checkPollActionRateLimit, logSecurityEvent } from "../utils/security";
 
-/**
- * Poll Creation Server Action
- * 
- * Creates a new poll with validated questions and options in the database.
- * This function is central to the application's core functionality as it:
- * 1. Establishes new poll entities with proper data validation and sanitization
- * 2. Associates polls with authenticated users for ownership and accountability
- * 3. Implements rate limiting to prevent poll creation abuse
- * 4. Creates both the poll record and its associated options in a coordinated way
- * 
- * Used in: The poll creation form submission process. This server action powers
- * the primary content creation flow, transforming user input into structured poll
- * data that forms the foundation of the voting system.
- * 
- * @param {FormData} formData - Form data containing poll question and options
- * @returns {Promise<{error: string | null}>} Result object with error message if creation failed
- */
+// CREATE POLL
 export async function createPoll(formData: FormData) {
   try {
     const supabase = await createClient();
@@ -140,27 +124,11 @@ export async function createPoll(formData: FormData) {
   }
 }
 
-/**
- * Poll Retrieval Server Action
- * 
- * Fetches detailed poll information including options and vote counts.
- * This function is essential to the application's data access layer as it:
- * 1. Serves as the primary data source for displaying poll details and results
- * 2. Securely validates poll IDs to prevent data access attacks
- * 3. Formats database results into a consistent structure for UI components
- * 4. Integrates with security logging for access monitoring
- * 
- * Used in: Poll detail pages, voting interfaces, and results displays.
- * This function powers the core information display throughout the application
- * wherever poll details need to be shown to users.
- * 
- * @param {string} id - The unique identifier of the poll to retrieve
- * @returns {Promise<{poll: PollData | null, error: string | null}>} Poll data object or error
- */
+// GET POLL BY ID
 export async function getPollById(id: string) {
   try {
     // Validate poll ID format
-    if (!(await validatePollId(id))) {
+    if (!validatePollId(id)) {
       logSecurityEvent('get_poll_by_id_error', false, { 
         details: `Invalid poll ID format: ${id}` 
       });
@@ -233,29 +201,11 @@ export async function getPollById(id: string) {
   }
 }
 
-/**
- * Vote Submission Server Action
- * 
- * Records a user's vote for a specific poll option in the database.
- * This function represents the core interaction of the voting system as it:
- * 1. Enables users to participate in polls by casting votes
- * 2. Ensures data integrity with comprehensive validation
- * 3. Prevents duplicate voting through user tracking
- * 4. Implements rate limiting to prevent voting abuse
- * 5. Works with both authenticated and anonymous users
- * 
- * Used in: Poll detail pages where users select and submit their vote choice.
- * This action represents the primary engagement mechanism for users interacting
- * with polls and directly contributes to poll results.
- * 
- * @param {string} pollId - The ID of the poll being voted on
- * @param {string} optionId - The ID of the selected option
- * @returns {Promise<{error: string | null}>} Result object with error message if vote submission failed
- */
+// SUBMIT VOTE
 export async function submitVote(pollId: string, optionId: string) {
   try {
     // Validate poll ID format
-    if (!(await validatePollId(pollId))) {
+    if (!validatePollId(pollId)) {
       logSecurityEvent('submit_vote_error', false, { 
         pollId,
         details: `Invalid poll ID format: ${pollId}` 
@@ -264,7 +214,7 @@ export async function submitVote(pollId: string, optionId: string) {
     }
 
     // Validate option ID format
-    if (!(await validatePollId(optionId))) {
+    if (!validatePollId(optionId)) {
       logSecurityEvent('submit_vote_error', false, { 
         pollId,
         details: `Invalid option ID format: ${optionId}` 
@@ -360,107 +310,11 @@ export async function submitVote(pollId: string, optionId: string) {
   }
 }
 
-/**
- * User Polls Retrieval Server Action
- * 
- * Fetches all polls created by the currently authenticated user.
- * This function is vital to the user dashboard experience as it:
- * 1. Enables users to manage and track their created content
- * 2. Forms the foundation of the personal polls dashboard
- * 3. Enforces proper authentication for accessing user-specific data
- * 4. Provides structured poll data for management interfaces
- * 
- * Used in: The user's polls dashboard page where they can see, manage,
- * and track all the polls they've created. This function powers the main
- * content management interface for poll creators.
- * 
- * @returns {Promise<{polls: PollData[], error: string | null}>} User's polls or error message
- */
-export async function getUserPolls() {
-  try {
-    const supabase = await createClient();
-    
-    // Get current user
-    const {
-      data: { user },
-      error: userError
-    } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      logSecurityEvent('get_user_polls_unauthorized', false, { 
-        details: 'Attempt to get polls without authentication' 
-      });
-      return { polls: [], error: "You must be logged in to view your polls" };
-    }
-    
-    // Get all polls created by the user
-    const { data, error } = await supabase
-      .from('polls')
-      .select(`
-        id,
-        title,
-        description,
-        creator_id,
-        is_active,
-        allow_multiple_choices,
-        created_at,
-        updated_at,
-        expires_at,
-        poll_options (
-          id,
-          text,
-          poll_id,
-          order_index
-        )
-      `)
-      .eq('creator_id', user.id)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      logSecurityEvent('get_user_polls_error', false, { 
-        userId: user.id,
-        details: `Database error: ${error.message}` 
-      });
-      return { polls: [], error: "Failed to retrieve polls. Please try again." };
-    }
-    
-    // Format the polls with their options
-    const formattedPolls = data.map(poll => ({
-      ...poll,
-      options: poll.poll_options || []
-    }));
-    
-    return { polls: formattedPolls, error: null };
-  } catch (err) {
-    console.error('Unhandled error in getUserPolls:', err);
-    logSecurityEvent('get_user_polls_error', false, { 
-      details: `Unhandled error: ${err instanceof Error ? err.message : String(err)}` 
-    });
-    return { polls: [], error: "An unexpected error occurred. Please try again." };
-  }
-}
-
-/**
- * Poll Deletion Server Action
- * 
- * Permanently removes a poll and all associated data from the system.
- * This function is critical to content management as it:
- * 1. Enables users to remove their created content from the platform
- * 2. Enforces strict ownership verification before deletion
- * 3. Implements cascading deletion of related records (options, votes)
- * 4. Applies rate limiting to prevent abuse of deletion capabilities
- * 
- * Used in: Poll management interfaces where users can delete their own polls.
- * This action represents the termination point in the poll lifecycle and
- * is essential for giving users control over their content.
- * 
- * @param {string} id - ID of the poll to delete
- * @returns {Promise<{error: string | null}>} Result object with error message if deletion failed
- */
+// DELETE POLL
 export async function deletePoll(id: string) {
   try {
     // Validate poll ID format
-    if (!(await validatePollId(id))) {
+    if (!validatePollId(id)) {
       logSecurityEvent('delete_poll_error', false, { 
         pollId: id,
         details: `Invalid poll ID format: ${id}` 

@@ -12,7 +12,7 @@ import { generateCSRFToken, validateCSRFToken } from "@/app/lib/utils/security-c
 export default function PollCreateForm() {
   const router = useRouter();
   const [options, setOptions] = useState<string[]>(["", ""]);
-  const [question, setQuestion] = useState<string>("");
+  const [title, setTitle] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
@@ -31,10 +31,10 @@ export default function PollCreateForm() {
     sessionStorage.setItem("pollCreateCsrfToken", token);
   }, []);
 
-  const handleQuestionChange = (value: string) => {
+  const handleTitleChange = (value: string) => {
     // Sanitize and limit length
     const sanitized = sanitizeText(value).slice(0, MAX_QUESTION_LENGTH);
-    setQuestion(sanitized);
+    setTitle(sanitized);
   };
 
   const handleOptionChange = (idx: number, value: string) => {
@@ -61,14 +61,14 @@ export default function PollCreateForm() {
   
   // Client-side validation before submission
   const validateForm = () => {
-    // Validate question
-    if (!question || question.trim().length === 0) {
-      setError("Question is required");
+    // Validate title
+    if (!title || title.trim().length === 0) {
+      setError("Title is required");
       return false;
     }
     
-    if (question.length > MAX_QUESTION_LENGTH) {
-      setError(`Question must be ${MAX_QUESTION_LENGTH} characters or less`);
+    if (title.length > MAX_QUESTION_LENGTH) {
+      setError(`Title must be ${MAX_QUESTION_LENGTH} characters or less`);
       return false;
     }
     
@@ -124,7 +124,7 @@ export default function PollCreateForm() {
       
       // Prepare sanitized data for submission
       const secureFormData = new FormData();
-      secureFormData.set("question", sanitizeText(question));
+            secureFormData.set("question", sanitizeText(title));
       
       // Filter out empty options and sanitize
       const filteredOptions = options.filter(opt => opt && opt.trim().length > 0);
@@ -165,18 +165,19 @@ export default function PollCreateForm() {
       <input type="hidden" name="csrfToken" value={csrfToken} />
       
       <div>
-        <Label htmlFor="question">Poll Question</Label>
+        <Label htmlFor="question">Poll Title</Label>
         <Input 
           name="question" 
           id="question"
-          value={question}
-          onChange={(e) => handleQuestionChange(e.target.value)}
+          value={title}
+          onChange={(e) => handleTitleChange(e.target.value)}
           required
           disabled={loading}
           maxLength={MAX_QUESTION_LENGTH}
+          placeholder="Enter your poll title here"
         />
         <p className="text-xs text-gray-500 mt-1">
-          {question.length}/{MAX_QUESTION_LENGTH} characters
+          {title.length}/{MAX_QUESTION_LENGTH} characters
         </p>
       </div>
       

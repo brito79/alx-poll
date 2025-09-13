@@ -3,14 +3,14 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { verifyPollOwnership } from '@/app/lib/utils/poll-authorization';
-import { isValidPollId } from '@/app/lib/utils/share-security';
+import { validatePollId as isValidPollId } from '@/app/lib/utils/poll-validation-server';
 
 // Import the secure client component
 import SecureEditPollForm from './SecureEditPollForm';
 
 export default async function EditPollPage({ params }: { params: { id: string } }) {
   // Validate poll ID format first
-  if (!params.id || !isValidPollId(params.id)) {
+  if (!params.id || !(await isValidPollId(params.id))) {
     redirect('/polls');
   }
   

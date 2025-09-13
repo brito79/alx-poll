@@ -20,6 +20,24 @@ import {
   shouldAllowSubmit
 } from '@/app/lib/utils/auth-security';
 
+/**
+ * LoginPage Component
+ * 
+ * Serves as the primary authentication entry point for the application.
+ * This component is critical to the application's security model as it:
+ * 1. Provides the user interface for existing users to authenticate
+ * 2. Implements multiple security measures against common authentication attacks
+ * 3. Acts as a gateway to the protected areas of the application
+ * 
+ * Used in: The authentication flow when users visit /login directly or are
+ * redirected from protected routes that require authentication.
+ * 
+ * Security features:
+ * - CSRF protection to prevent cross-site request forgery
+ * - Rate limiting to prevent brute force attacks
+ * - Attempt counting for progressive security hardening
+ * - Secure error handling that doesn't leak sensitive information
+ */
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -28,13 +46,38 @@ export default function LoginPage() {
   const [lastSubmitTime, setLastSubmitTime] = useState(0);
   const [attemptCount, setAttemptCount] = useState(0);
   
-  // Set up CSRF protection on component mount
+  /**
+   * CSRF Protection Initialization
+   * 
+   * Generates and stores a CSRF token when the component mounts.
+   * Critical for preventing cross-site request forgery attacks by ensuring
+   * that form submissions originated from our application.
+   * 
+   * This effect runs only once at component initialization, establishing
+   * the security context for the login form's lifecycle.
+   */
   useEffect(() => {
     const token = generateCsrfToken();
     setCsrfToken(token);
     storeCsrfToken(token);
   }, []);
 
+  /**
+   * Form Submission Handler
+   * 
+   * Processes login form submissions with comprehensive security measures.
+   * This function is the central authentication control point that:
+   * 1. Implements client-side rate limiting to prevent brute force attacks
+   * 2. Enforces progressive security hardening with attempt counting
+   * 3. Validates CSRF tokens to prevent cross-site request forgery
+   * 4. Interfaces with the server-side authentication system
+   * 5. Manages the UI state during the authentication flow
+   * 
+   * Used directly by the login form's onSubmit event, this handler coordinates
+   * the entire authentication process and determines the subsequent user experience.
+   * 
+   * @param {React.FormEvent<HTMLFormElement>} event - The form submission event
+   */
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     
@@ -56,40 +99,74 @@ export default function LoginPage() {
       return;
     }
     
+    // Update UI state for authentication in progress
     setLoading(true);
     setError(null);
 
+    // Extract and validate form data
     const formData = new FormData(event.currentTarget);
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
     const submittedCsrfToken = formData.get('csrfToken') as string;
     
-    // Validate CSRF token
+    /**
+     * CSRF Token Validation
+     * 
+     * Protects against cross-site request forgery by verifying that the form
+     * submission originated from our application. This is a critical security
+     * check that prevents attackers from tricking authenticated users into
+     * performing unwanted actions.
+     */
     if (!validateCsrfToken(submittedCsrfToken)) {
       setError('Security verification failed. Please refresh the page');
       setLoading(false);
       return;
     }
 
+    /**
+     * Authentication Attempt and Response Handling
+     * 
+     * Communicates with the server-side authentication system and processes
+     * the response appropriately. This try/catch block:
+     * 1. Makes the actual authentication request to the server
+     * 2. Handles success by redirecting to the application's main area
+     * 3. Processes errors safely without exposing sensitive information
+     * 4. Manages unexpected errors to maintain a stable user experience
+     */
     try {
       const result = await login({ email, password });
 
       if (result?.error) {
-        // Map error to user-friendly message
+        // Map error to user-friendly message without exposing sensitive details
         setError(mapAuthErrorToUserMessage(result.error));
         setLoading(false);
       } else {
-        // Reset attempt counter on success
+        // Reset attempt counter on successful authentication
         setAttemptCount(0);
-        // Use router for secure navigation
+        // Use router for secure navigation to the application's main area
         router.push('/polls');
       }
     } catch (err) {
+      // Handle unexpected errors gracefully without exposing system details
       setError('Connection error. Please try again');
       setLoading(false);
     }
   };
 
+  /**
+   * Component Rendering
+   * 
+   * Renders the login interface with accessibility and security considerations.
+   * This UI implementation:
+   * 1. Presents a clean, focused authentication form
+   * 2. Includes visual security indicators to build user trust
+   * 3. Provides clear feedback for error states
+   * 4. Maintains accessibility best practices
+   * 5. Offers navigation paths to registration and password recovery
+   * 
+   * The rendered form connects directly to the handleSubmit function,
+   * completing the authentication user experience flow.
+   */
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-50">
       <Card className="w-full max-w-md">
