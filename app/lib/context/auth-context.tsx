@@ -1,11 +1,21 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { 
+  createContext, 
+  useContext, 
+  useEffect, 
+  useReducer, 
+  useMemo,
+  useCallback
+} from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Session, User } from '@supabase/supabase-js';
 
+// --- State and Action Types for Reducer ---
+
 /**
- * Auth state interface to ensure atomic state updates
+ * Represents the shape of the authentication state.
+ * Using a reducer for state management to handle complex state transitions atomically.
  */
 interface AuthState {
   session: Session | null;
@@ -15,224 +25,172 @@ interface AuthState {
 }
 
 /**
- * Auth context interface with security enhancements
+ * Defines the actions that can be dispatched to update the auth state.
  */
-interface AuthContextType {
-  session: Session | null;
-  user: User | null;
-  signOut: () => Promise<void>;
-  loading: boolean;
-  error: string | null;
-  isAuthenticated: boolean;
-}
+type AuthAction =
+  | { type: 'INITIAL_STATE_LOADED'; payload: { session: Session | null; user: User | null } }
+  | { type: 'AUTH_STATE_CHANGED'; payload: { session: Session | null; user: User | null } }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SIGN_OUT' };
 
-// Initial auth state
+// --- Reducer Function ---
+
 const initialAuthState: AuthState = {
   session: null,
   user: null,
   loading: true,
-  error: null
+  error: null,
 };
 
-// Create the auth context with default values
-const AuthContext = createContext<AuthContextType>({
-  session: null,
-  user: null,
-  signOut: async () => {},
-  loading: true,
-  error: null,
-  isAuthenticated: false
-});
+/**
+ * Reducer function to manage authentication state transitions.
+ * @param state - The current authentication state.
+ * @param action - The action to perform.
+ * @returns The new authentication state.
+ */
+const authReducer = (state: AuthState, action: AuthAction): AuthState => {
+  switch (action.type) {
+    case 'INITIAL_STATE_LOADED':
+    case 'AUTH_STATE_CHANGED':
+      return {
+        ...state,
+        session: action.payload.session,
+        user: action.payload.user,
+        error: null,
+        loading: false,
+      };
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload, loading: false };
+    case 'SIGN_OUT':
+      return { ...initialAuthState, loading: false };
+    default:
+      return state;
+  }
+};
+
+// --- Context Definition ---
+
+/**
+ * Auth context interface with security enhancements and helper functions.
+ */
+interface AuthContextType extends AuthState {
+  signOut: () => Promise<void>;
+  isAuthenticated: boolean;
+  hasRole: (requiredRoles: string[]) => boolean;
+  isResourceOwner: (resourceUserId: string | null) => boolean;
+  getUserDisplayInfo: () => {
+    id: string;
+    email: string | undefined;
+    username: any;
+    avatarUrl: any;
+  } | null;
+}
+
+// Create the auth context with a default undefined value to enforce provider usage.
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+
+// --- AuthProvider Component ---
 
 /**
  * Authentication Provider Component
  * 
- * Establishes the global authentication context for the entire application.
- * This component is foundational to the app's security architecture as it:
- * 1. Manages the authentication state across all components
- * 2. Provides real-time session tracking and token refresh capabilities
- * 3. Handles authentication events (sign-in, sign-out, session expiration)
- * 4. Establishes security boundaries for protected resources and routes
- * 
- * Used in: The root layout of the application, wrapping all other components.
- * Every authenticated interaction and protected route depends on this provider
- * to determine access permissions and user identity.
+ * Establishes and manages the global authentication state for the application using
+ * a reducer for more predictable state management. It handles session tracking,
+ * user data, and provides security-related helper functions.
  * 
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Child components to render within this provider
  */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  // Create Supabase client once for efficiency and consistent authentication state
   const supabase = useMemo(() => createClient(), []);
-  
-  // Use a single atomic state object to prevent race conditions during auth state updates
-  const [authState, setAuthState] = useState<AuthState>(initialAuthState);
+  const [state, dispatch] = useReducer(authReducer, initialAuthState);
 
-  // Effect to handle auth state and session management
   useEffect(() => {
-    let mounted = true;
+    // Set initial loading state
+    dispatch({ type: 'SET_LOADING', payload: true });
 
-    // Load initial user data
-    const getUser = async () => {
+    // Fetch initial session and user data
+    const initializeAuth = async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const { data: userData, error } = await supabase.auth.getUser();
-
-        if (error) {
-          // Only log error type, not full details in dev only
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Auth error type:', error.name);
-          }
-          
-          // Handle error gracefully
-          if (mounted) {
-            setAuthState({
-              user: null,
-              session: null,
-              error: 'Unable to authenticate',
-              loading: false
-            });
-          }
-          return;
-        }
-        
-        if (mounted) {
-          // Set both session and user simultaneously
-          setAuthState({
-            user: userData.user,
-            session: sessionData.session,
-            error: null,
-            loading: false
-          });
-        }
-      } catch (err) {
-        if (mounted) {
-          setAuthState({
-            user: null,
-            session: null,
-            error: 'Authentication system unavailable',
-            loading: false
-          });
-        }
+        const { data: { session } } = await supabase.auth.getSession();
+        dispatch({ 
+          type: 'INITIAL_STATE_LOADED', 
+          payload: { session, user: session?.user ?? null } 
+        });
+      } catch (error) {
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to initialize authentication.' });
       }
     };
 
-    // Initialize auth state
-    getUser();
+    initializeAuth();
 
-    // Listen for auth state changes
+    // Subscribe to auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (mounted) {
-        // Update state based on auth events
-        setAuthState(prev => ({
-          ...prev,
-          user: session?.user ?? null,
-          session: session,
-          // Keep existing error for most events, but clear it on sign-in
-          error: event === 'SIGNED_IN' ? null : prev.error,
-          loading: false
-        }));
-        
-        // Additional security logging could be added here for suspicious events
-        if (process.env.NODE_ENV === 'development') {
-          if (event === 'PASSWORD_RECOVERY' || event === 'TOKEN_REFRESHED') {
-            console.info('Security event:', event);
-          }
-        }
+      if (process.env.NODE_ENV === 'development') {
+        console.info('Security event:', event);
       }
+      dispatch({ 
+        type: 'AUTH_STATE_CHANGED', 
+        payload: { session, user: session?.user ?? null }
+      });
     });
 
-    // Session expiration and refresh management
-    const sessionTimeoutCheck = setInterval(() => {
-      const { session } = authState;
-      
-      if (session && session.expires_at) {
-        const expiresAt = new Date(session.expires_at * 1000);
-        const now = new Date();
-        const timeRemaining = expiresAt.getTime() - now.getTime();
-        
-        // If session expires in less than 5 minutes, refresh it
-        if (timeRemaining < 5 * 60 * 1000 && timeRemaining > 0) {
-          supabase.auth.refreshSession();
-        }
-        
-        // If session is already expired, update state
-        if (timeRemaining <= 0) {
-          setAuthState(prev => ({
-            ...prev,
-            error: 'Your session has expired. Please sign in again.',
-            session: null,
-            user: null
-          }));
-        }
-      }
-    }, 30000); // Check every 30 seconds
-
-    // Clean up subscriptions and intervals
+    // Cleanup subscription on unmount
     return () => {
-      mounted = false;
-      clearInterval(sessionTimeoutCheck);
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
 
-  /**
-   * Secure Sign Out Function
-   * 
-   * Terminates the user's active session with comprehensive error handling.
-   * This function is critical to the authentication lifecycle as it:
-   * 1. Provides a controlled mechanism to end user sessions
-   * 2. Ensures proper cleanup of authentication state
-   * 3. Handles potential failures gracefully to prevent stuck states
-   * 4. Updates the auth context to reflect the unauthenticated state
-   * 
-   * Used in: The application header's logout button, session timeout handlers,
-   * and security-sensitive areas where manual session termination is needed.
-   * This is the primary way users explicitly end their authenticated sessions.
-   * 
-   * @returns {Promise<void>} Promise that resolves when sign out is complete
-   */
-  const signOut = async (): Promise<void> => {
+  const signOut = useCallback(async (): Promise<void> => {
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      // Show loading state while signing out for user feedback
-      setAuthState(prev => ({ ...prev, loading: true }));
-      
       const { error } = await supabase.auth.signOut();
-      
       if (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Sign out error:', error.name);
-        }
-        
-        // Update state with error
-        setAuthState(prev => ({
-          ...prev,
-          error: 'Error signing out. Please try again.',
-          loading: false
-        }));
+        throw error;
       }
-      // Auth state listener will handle the rest
-    } catch (err) {
-      setAuthState(prev => ({
-        ...prev,
-        error: 'Sign out failed. Please try again.',
-        loading: false
-      }));
+      dispatch({ type: 'SIGN_OUT' });
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Sign out error:', error);
+      }
+      dispatch({ type: 'SET_ERROR', payload: 'Sign out failed. Please try again.' });
     }
-  };
+  }, [supabase]);
 
-  // Derived authentication state
-  const isAuthenticated = !!authState.user;
+  const hasRole = useCallback((requiredRoles: string[]): boolean => {
+    if (!state.user) return false;
+    const userRoles = state.user.app_metadata?.roles || [];
+    return requiredRoles.some(role => userRoles.includes(role));
+  }, [state.user]);
 
-  // Create value object with all required properties
-  const contextValue: AuthContextType = {
-    session: authState.session,
-    user: authState.user,
+  const isResourceOwner = useCallback((resourceUserId: string | null): boolean => {
+    if (!state.user || !resourceUserId) return false;
+    return state.user.id === resourceUserId;
+  }, [state.user]);
+
+  const getUserDisplayInfo = useCallback(() => {
+    if (!state.user) return null;
+    return {
+      id: state.user.id,
+      email: state.user.email,
+      username: state.user.user_metadata?.username || null,
+      avatarUrl: state.user.user_metadata?.avatar_url || null,
+    };
+  }, [state.user]);
+
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  const contextValue = useMemo(() => ({
+    ...state,
+    isAuthenticated: !!state.user,
     signOut,
-    loading: authState.loading,
-    error: authState.error,
-    isAuthenticated
-  };
+    hasRole,
+    isResourceOwner,
+    getUserDisplayInfo,
+  }), [state, signOut, hasRole, isResourceOwner, getUserDisplayInfo]);
 
   return (
     <AuthContext.Provider value={contextValue}>
@@ -241,108 +199,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// --- useAuth Hook ---
+
 /**
  * Enhanced Authentication Hook
  * 
- * Provides access to authentication state and security utilities throughout the app.
- * This hook is central to the application's security implementation as it:
- * 1. Creates a consistent interface for accessing authentication state
- * 2. Provides role-based access control capabilities
- * 3. Offers resource ownership validation for authorization
- * 4. Abstracts sensitive user data into safe display formats
+ * Provides access to the authentication context, including state and security helpers.
+ * Throws an error if used outside of an AuthProvider.
  * 
- * Used in: Throughout the application in any component that needs to:
- * - Check if a user is authenticated
- * - Access the current user's information
- * - Verify permissions for protected operations
- * - Implement conditional rendering based on authentication state
- * - Handle login/logout flows
- * 
- * @returns {AuthContextType & SecurityHelpers} Authentication state and security helper functions
+ * @returns {AuthContextType} The authentication context value.
  */
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  
-  // Return context with additional security helper functions
-  return {
-    ...context,
-    
-    /**
-     * Role-Based Access Control Function
-     * 
-     * Verifies if the current user has any of the specified roles.
-     * This function is essential to the application's authorization model as it:
-     * 1. Enables fine-grained access control throughout the application
-     * 2. Creates a reusable pattern for role-based authorization checks
-     * 3. Centralizes role verification to ensure consistent security enforcement
-     * 4. Gracefully handles unauthenticated states without errors
-     * 
-     * Used in: Protected routes, admin panels, conditional UI rendering,
-     * and anywhere the application needs to restrict features based on user roles.
-     * This is a primary authorization mechanism for role-gated functionality.
-     * 
-     * @param {string[]} requiredRoles - Array of role names to check against
-     * @returns {boolean} True if user has any of the required roles
-     */
-    hasRole: (requiredRoles: string[]): boolean => {
-      if (!context.user || !context.isAuthenticated) return false;
-      
-      // Get user roles from metadata
-      const userRoles = context.user.app_metadata?.roles || [];
-      return requiredRoles.some(role => userRoles.includes(role));
-    },
-    
-    /**
-     * Resource Ownership Verification Function
-     * 
-     * Determines if the current user owns a specific resource.
-     * This function is crucial to the application's data security model as it:
-     * 1. Enforces ownership-based access control for user-specific resources
-     * 2. Prevents unauthorized access to other users' content
-     * 3. Creates a consistent pattern for ownership verification
-     * 4. Simplifies complex authorization checks in components
-     * 
-     * Used in: Poll management screens, voting interfaces, content editing forms,
-     * and anywhere the application needs to verify that a user owns the resource
-     * they're attempting to modify, view, or delete.
-     * 
-     * @param {string|null} resourceUserId - The user ID associated with the resource
-     * @returns {boolean} True if the current user owns the resource
-     */
-    isResourceOwner: (resourceUserId: string | null): boolean => {
-      if (!context.user || !context.isAuthenticated || !resourceUserId) return false;
-      return context.user.id === resourceUserId;
-    },
-    
-    /**
-     * Safe User Information Accessor
-     * 
-     * Provides a sanitized subset of user data for display purposes.
-     * This function enhances application security and privacy by:
-     * 1. Creating a boundary between sensitive user data and display contexts
-     * 2. Ensuring only appropriate user information is exposed in the UI
-     * 3. Standardizing the user information format across components
-     * 4. Preventing accidental exposure of sensitive authentication details
-     * 
-     * Used in: Profile displays, headers showing user information, user-specific
-     * UI elements, and anywhere the application needs to show user information
-     * without exposing sensitive authentication details.
-     * 
-     * @returns {Object|null} Sanitized user display information or null if not authenticated
-     */
-    getUserDisplayInfo: () => {
-      if (!context.user) return null;
-      
-      return {
-        id: context.user.id,
-        email: context.user.email,
-        username: context.user.user_metadata?.username || null,
-        avatarUrl: context.user.user_metadata?.avatar_url || null
-      };
-    }
-  };
+  return context;
 };
