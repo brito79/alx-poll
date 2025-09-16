@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { LoginFormData, RegisterFormData } from '../types';
-import { validateLoginForm } from '../utils/validation';
 import { isRateLimited, resetRateLimit, logAuthEvent } from '../utils/security';
 
 /**
@@ -25,7 +24,8 @@ import { isRateLimited, resetRateLimit, logAuthEvent } from '../utils/security';
 export async function login(data: LoginFormData) {
   try {
     // Step 1: Validate input data
-    const validation = validateLoginForm(data);
+    const { validateLoginForm } = await import('@/lib/auth/utils/server-validation');
+    const validation = await validateLoginForm(data);
     if (!validation.isValid) {
       return { error: validation.message };
     }
@@ -109,9 +109,9 @@ export async function login(data: LoginFormData) {
  */
 export async function register(data: RegisterFormData) {
   try {
-    // Import validation utility
-    const { validateRegisterForm } = await import('../utils/validation');
-    const validation = validateRegisterForm(data);
+    // Import server-side validation utility
+    const { validateRegisterForm } = await import('@/lib/auth/utils/server-validation');
+    const validation = await validateRegisterForm(data);
     if (!validation.isValid) {
       return { error: validation.message };
     }

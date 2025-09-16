@@ -14,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/app/lib/context/auth-context";
+import { SessionIndicator } from "@/app/components/session-status";
+import { useSessionManager } from "@/lib/auth/hooks/use-session-manager";
 
 /**
  * Dashboard Layout Component
@@ -35,6 +37,13 @@ import { useAuth } from "@/app/lib/context/auth-context";
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, signOut, loading } = useAuth();
   const router = useRouter();
+  
+  // Initialize session management
+  useSessionManager({
+    refreshInterval: 10, // Refresh every 10 minutes
+    warningTime: 5, // Show warning 5 minutes before expiry
+    maxRetries: 3 // Max 3 retry attempts for failed refresh
+  });
 
   /**
    * Authentication Protection Effect
@@ -141,6 +150,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </Link>
           </nav>
           <div className="flex items-center space-x-4">
+            {/* Session Status Indicator */}
+            <SessionIndicator className="hidden md:flex" />
+            
             <Button asChild>
               <Link href="/create">Create Poll</Link>
             </Button>

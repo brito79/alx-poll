@@ -1,3 +1,11 @@
 {
-    "coderabbit.selfHostedUrl": ""
+    "coderabbit.selfHostedUrl": "",
+    "chat.mcp.serverSampling": {
+        "alx-polly/.vscode/mcp.json: supabase": {
+            "allowedModels": [
+                "copilot/gpt-4.1",
+                "copilot/claude-3.7-sonnet"
+            ]
+        }
+    }
 }
